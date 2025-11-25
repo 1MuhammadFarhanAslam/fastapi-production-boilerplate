@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  # -----------------------------
+  # SERVICE 1: The Database
+  # -----------------------------
+  db:
+    image: postgres:15-alpine
+    container_name: blog_db
+    restart: always
+    ports:
+      - "5432:5432"  # Exposes DB to localhost for your Local App
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-password123}
+      - POSTGRES_DB=${POSTGRES_DB:-blog_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - blog_network
+
+  # -----------------------------
+  # SERVICE 2: The FastAPI App
+  # -----------------------------
+  web:
+    build: .
+    container_name: blog_api
+    restart: always
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    # We override the .env file for the container network
+    environment:
+      - POSTGRES_SERVER=db 
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-password123}
+      - POSTGRES_DB=${POSTGRES_DB:-blog_db}
+    # Mount source code for hot-reloading in Docker (Optional for Dev)
+    volumes:
+      - ./src:/app/src
+    command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - blog_network
+
+volumes:
+  postgres_data:
+
+networks:
+  blog_network:
+    driver: bridge
