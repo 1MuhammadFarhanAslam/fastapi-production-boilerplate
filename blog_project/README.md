@@ -21,9 +21,13 @@ A production-ready FastAPI application with PostgreSQL database, async SQLAlchem
 - ⚡ **FastAPI** - Modern, fast web framework for building APIs
 - 🗄️ **PostgreSQL** - Robust relational database
 - 🔄 **Async SQLAlchemy** - Asynchronous ORM for database operations
+- 🔐 **JWT Authentication** - Secure token-based authentication
+- 👥 **Role-Based Access Control** - Admin and User roles with permissions
+- 🔑 **Password Hashing** - Bcrypt password encryption
 - 🐳 **Docker** - Containerized application with Docker Compose
 - 🔧 **Pydantic Settings** - Environment-based configuration management
 - 📝 **Auto-generated API Docs** - Interactive Swagger UI and ReDoc
+- 📊 **Logging** - Structured logging for monitoring
 - 🏗️ **Clean Architecture** - Separation of concerns with layered structure
 
 ## 🛠️ Tech Stack
@@ -34,6 +38,8 @@ A production-ready FastAPI application with PostgreSQL database, async SQLAlchem
 - **PostgreSQL**: 15
 - **asyncpg**: 0.31.0
 - **Pydantic**: 2.x
+- **python-jose**: JWT token handling
+- **passlib**: Password hashing with bcrypt
 - **Docker & Docker Compose**
 
 ## 📁 Project Architecture
@@ -44,20 +50,26 @@ blog_project/
 │   └── blog_project/
 │       ├── api/              # API routes and endpoints
 │       │   ├── __init__.py
-│       │   └── routes.py
+│       │   ├── routes.py     # Post endpoints
+│       │   ├── users.py      # User signup
+│       │   ├── auth.py       # Authentication (login)
+│       │   ├── user_profile.py  # User profile & password change
+│       │   └── admin.py      # Admin-only endpoints
 │       ├── core/             # Core configuration
 │       │   ├── __init__.py
-│       │   └── config.py     # Settings and environment variables
+│       │   ├── config.py     # Settings and environment variables
+│       │   ├── security.py   # Password hashing & JWT
+│       │   └── deps.py       # Authentication dependencies
 │       ├── db/               # Database configuration
 │       │   ├── __init__.py
 │       │   ├── base.py       # SQLAlchemy Base
 │       │   └── session.py    # Database session management
 │       ├── models/           # SQLAlchemy models
 │       │   ├── __init__.py
-│       │   └── models.py     # User and Post models
+│       │   └── models.py     # User and Post models with roles
 │       ├── schemas/          # Pydantic schemas
 │       │   ├── __init__.py
-│       │   └── schemas.py
+│       │   └── schemas.py    # Request/Response schemas
 │       ├── __init__.py
 │       └── main.py           # Application entry point
 ├── tests/                    # Test suite
@@ -155,6 +167,11 @@ Create a `.env` file in the project root:
 PROJECT_NAME=Blog API
 VERSION=1.0.0
 API_V1_STR=/api/v1
+
+# Security
+SECRET_KEY=your-secret-key-change-in-production-use-openssl-rand-hex-32
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
 
 # Database Configuration
 POSTGRES_USER=postgres
@@ -298,35 +315,101 @@ docker-compose rm
 
 ## 📚 API Documentation
 
+### Authentication Flow
+
+1. **Signup**: Create a new user account
+2. **Login**: Get JWT access token
+3. **Use Token**: Include token in Authorization header for protected endpoints
+
 ### Available Endpoints
 
-#### Root Endpoint
-```http
-GET /
-```
-Returns welcome message.
+#### Public Endpoints (No Authentication Required)
 
-#### Posts Endpoints
 ```http
-GET    /api/v1/posts          # List all posts
-POST   /api/v1/posts          # Create new post
-GET    /api/v1/posts/{id}     # Get post by ID
-PUT    /api/v1/posts/{id}     # Update post
-DELETE /api/v1/posts/{id}     # Delete post
+GET  /                        # Welcome message
+GET  /api/v1/posts            # List all posts
 ```
 
-### Example API Request
+#### Authentication Endpoints
 
+```http
+POST /api/v1/users            # User signup (public)
+POST /api/v1/auth/login       # Login and get JWT token
+```
+
+#### User Endpoints (Requires Authentication)
+
+```http
+GET  /api/v1/profile/me              # Get current user profile
+PUT  /api/v1/profile/change-password # Change password
+POST /api/v1/posts                   # Create blog post
+```
+
+#### Admin Endpoints (Requires Admin Role)
+
+```http
+GET    /api/v1/admin/users       # List all users
+DELETE /api/v1/admin/users/{id}  # Delete user
+GET    /api/v1/admin/posts       # List all posts
+DELETE /api/v1/admin/posts/{id}  # Delete post
+```
+
+### Example API Requests
+
+#### 1. User Signup
 ```bash
-# Create a new post
+curl -X POST "http://localhost:8000/api/v1/users" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "password": "securepassword123",
+    "role": "user"
+  }'
+```
+
+#### 2. Login
+```bash
+curl -X POST "http://localhost:8000/api/v1/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "password": "securepassword123"
+  }'
+
+# Response:
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "bearer"
+}
+```
+
+#### 3. Create Post (Authenticated)
+```bash
 curl -X POST "http://localhost:8000/api/v1/posts" \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -d '{
     "title": "My First Post",
     "content": "This is the content of my first post",
-    "published": true,
-    "author_id": 1
+    "published": true
   }'
+```
+
+#### 4. Change Password
+```bash
+curl -X PUT "http://localhost:8000/api/v1/profile/change-password" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -d '{
+    "old_password": "securepassword123",
+    "new_password": "newsecurepassword456"
+  }'
+```
+
+#### 5. Admin - List All Users
+```bash
+curl -X GET "http://localhost:8000/api/v1/admin/users" \
+  -H "Authorization: Bearer ADMIN_JWT_TOKEN"
 ```
 
 ### Interactive Documentation
@@ -353,6 +436,7 @@ class User(Base):
     email: str (Unique, Indexed)
     password_hash: str
     is_active: bool
+    role: UserRole (Enum: admin/user)
     posts: List[Post] (Relationship)
 ```
 
@@ -493,14 +577,31 @@ Changes to Python files will automatically restart the server.
 
 ## 🔒 Security Best Practices
 
+- ✅ **JWT Authentication** - Implemented with secure token-based auth
+- ✅ **Password Hashing** - Bcrypt encryption for passwords
+- ✅ **Role-Based Access Control** - Admin and User roles
 - Store sensitive data in `.env` file (never commit to Git)
+- Use strong SECRET_KEY (generate with `openssl rand -hex 32`)
 - Use strong passwords for database
-- Implement authentication/authorization (JWT, OAuth2)
 - Enable CORS only for trusted origins
 - Use HTTPS in production
 - Regularly update dependencies
 - Implement rate limiting
 - Validate and sanitize all inputs
+
+### Creating Admin User
+
+To create an admin user, signup with role="admin":
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/users" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "admin@example.com",
+    "password": "adminpassword",
+    "role": "admin"
+  }'
+```
 
 ## 📝 License
 
