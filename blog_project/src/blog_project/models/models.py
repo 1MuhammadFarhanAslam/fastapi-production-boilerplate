@@ -19,7 +19,7 @@ class User(Base):
     role: Mapped[UserRole] = mapped_column(Enum(UserRole), default=UserRole.USER)
 
     # Relationship to Post
-    posts: Mapped[List["Post"]] = relationship("Post", back_populates="author")
+    posts: Mapped[List["Post"]] = relationship("Post", back_populates="author", cascade="all, delete-orphan")
     
 
 class Post(Base):
