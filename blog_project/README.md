@@ -296,14 +296,27 @@ Go to http://localhost:8000/docs and use:
 
 ### Quick Start with Docker Compose
 
-#### Step 1: Build and Run Containers
+#### Run Both FastAPI + PostgreSQL in Docker
 
 ```bash
-# Build and start all services
+# Build and start all services (DB + FastAPI)
 docker-compose up --build
 
 # Run in detached mode
 docker-compose up -d
+
+# Access application
+http://localhost:8000/docs
+```
+
+#### Run Only PostgreSQL in Docker (FastAPI Locally)
+
+```bash
+# Start only database
+docker-compose up -d db
+
+# Run FastAPI locally
+uvicorn src.blog_project.main:app --reload
 ```
 
 #### Step 2: Verify Services
@@ -364,6 +377,24 @@ docker stats
 # Remove all stopped containers
 docker-compose rm
 ```
+
+### Running FastAPI in Container vs Locally
+
+| Aspect | FastAPI in Container | FastAPI Locally |
+|--------|---------------------|------------------|
+| **Setup** | `docker-compose up` | `uvicorn src.blog_project.main:app --reload` |
+| **Database Connection** | `POSTGRES_SERVER=db` | `POSTGRES_SERVER=localhost` |
+| **Hot Reload** | ✅ Enabled (volume mount) | ✅ Enabled |
+| **Port** | `8000:8000` | `8000` |
+| **Dependencies** | Isolated in container | Local Python environment |
+| **Best For** | Production-like testing | Quick development |
+
+**To switch between modes:**
+
+1. **Run FastAPI in Docker**: Use `docker-compose up` (both services)
+2. **Run FastAPI locally**: Use `docker-compose up -d db` (DB only) + `uvicorn` command
+
+No code changes needed - the `.env` file handles configuration automatically!
 
 ## 📚 API Documentation
 
@@ -797,19 +828,53 @@ For questions or support, please open an issue in the repository.
 
 ### Quick Start Guide
 
+#### Option 1: Run Everything in Docker (Recommended)
+
 ```bash
 # 1. Clone and navigate
 git clone <repo-url>
 cd blog_project
 
-# 2. Start database
+# 2. Regenerate poetry.lock (if pyproject.toml changed)
+poetry lock
+
+# 3. Start all services (DB + FastAPI)
+docker-compose up --build -d
+
+# 4. Check container status
+docker-compose ps
+
+# 5. View logs
+docker-compose logs -f
+# Or view specific service logs
+docker-compose logs web --tail 20
+
+# 6. Access Swagger UI
+http://localhost:8000/docs
+
+# 7. Login with default admin
+Username: admin@example.com
+Password: Admin@123456
+
+# 8. Stop containers
+docker-compose down
+```
+
+#### Option 2: Run FastAPI Locally, PostgreSQL in Docker
+
+```bash
+# 1. Clone and navigate
+git clone <repo-url>
+cd blog_project
+
+# 2. Start database only
 docker-compose up -d db
 
 # 3. Install dependencies
 poetry install
 poetry shell
 
-# 4. Run application
+# 4. Run application locally
 uvicorn src.blog_project.main:app --reload
 
 # 5. Access Swagger UI
@@ -818,6 +883,21 @@ http://localhost:8000/docs
 # 6. Login with default admin
 Username: admin@example.com
 Password: Admin@123456
+```
+
+### Troubleshooting Docker Build
+
+If you encounter Poetry lock file errors:
+
+```bash
+# Regenerate poetry.lock file
+poetry lock
+
+# Rebuild containers without cache
+docker-compose build --no-cache
+
+# Start containers
+docker-compose up -d
 ```
 ---
 
